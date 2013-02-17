@@ -1,0 +1,18 @@
+swt - simple widget toolkit
+===========================
+hbox: 
+
+Installation
+------------
+Edit config.mk to match your local setup. swt is installed into
+/usr/local by default.
+
+Afterwards enter the following command to build and install swt 
+(if necessary as root):
+
+    $ make clean install
+
+
+Running swt
+-----------
+Simply invoke the 'swt' command with the required arguments.
