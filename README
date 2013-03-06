@@ -1,6 +1,16 @@
 swt - simple widget toolkit
 ===========================
-hbox: 
+
+BNF:
+
+command ::= DRAW | DUMP | NOOP | QUIT
+DUMP    ::= dump | dump id
+NOOP    ::= noop
+QUIT    ::= quit
+DRAW    ::= draw WIDGETS
+WIDGETS ::= WIDGET | WIDGETS
+WIDGET  ::= HBOX VBOX FRAME LABEL EMBED
+HBOX    ::= hbox '(' WIDGETS ')
 
 Installation
 ------------
