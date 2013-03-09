@@ -1,23 +1,35 @@
+THANKS ii :)
+
 swt - simple widget toolkit
 ===========================
 
 BNF:
 
-command ::= DRAW | DUMP | NOOP | QUIT
-DUMP    ::= dump | dump id
-NOOP    ::= noop
-QUIT    ::= quit
-DRAW    ::= draw WIDGETS
-WIDGETS ::= WIDGET | WIDGETS
-WIDGET  ::= HBOX VBOX FRAME LABEL EMBED
-HBOX    ::= hbox '(' WIDGETS ')
+<commands> ::= <command> { ";" <command> }
+<command>  ::= <draw> | 
+               <dump> | 
+               <noop> | 
+               <quit>
+<dump>     ::= dump | 
+               dump id
+<noop>     ::= noop
+<quit>     ::= quit
+<draw>     ::= draw <widgets>
+<widgets>  ::= <widget> { <widget> }
+<widget>   ::= <hbox> | 
+               <vbox> | 
+               <frame> | 
+               <label> | 
+               <embed>
+<hbox>     ::= hbox "(" <widgets> ")"
+
 
 Installation
 ------------
 Edit config.mk to match your local setup. swt is installed into
 /usr/local by default.
 
-Afterwards enter the following command to build and install swt 
+Afterwards enter the following command to build and install swt
 (if necessary as root):
 
     $ make clean install
