@@ -26,15 +26,16 @@
 #define PING_TIMEOUT 300
 
 #define MAX(A, B)               ((A) > (B) ? (A) : (B))
-#define MIN(A, B)               ((A) < (B) ? (A) : (B))
 
 static void createfifo(void);
 static void createout(void);
 static void die(const char *errstr, ...);
+static void noop(void);
 static void parse(void);
 static void resetfifo(void);
 static void run(void);
 static void usage(void);
+static void quit(void);
 static void writeout(const char *msg, ...);
 
 char *argv0;
@@ -70,6 +71,23 @@ usage(void) {
 }
 
 static void
+quit(void) {
+	if(close(infd) == -1) {
+		perror("unable to close fifo");
+		exit(EXIT_FAILURE);
+	}
+
+	writeout("done\n");
+
+	if(fclose(outfile) == -1) {
+		perror("unable to close outfile");
+		exit(EXIT_FAILURE);
+	}
+
+	exit(EXIT_SUCCESS);
+}
+
+static void
 createfifo(void) {
 	if(access(in, F_OK) == -1)
 		mkfifo(in, S_IRWXU);
@@ -81,7 +99,7 @@ createfifo(void) {
 }
 
 static void
-resetfifo() {
+resetfifo(void) {
 	if(close(infd) == -1) {
 		perror("unable to close fifo");
 		exit(EXIT_FAILURE);
@@ -96,6 +114,14 @@ createout(void) {
 		perror("unable to open output file");
 		exit(EXIT_FAILURE);
 	}
+}
+
+static void
+noop(void) {
+	time_t t;
+
+	t = time(NULL);
+	writeout("NOOP %lu\n", t);
 }
 
 static void
@@ -119,10 +145,7 @@ parse(void) {
 		if(cmd == NULL)
 			break;
 		if(!strncasecmp("NOOP", cmd, 4)) {
-			writeout("NOOP\n");
-			break;
-		} else if(!strncasecmp("QUIT", cmd, 4)) {
-			writeout("QUIT\n");
+			noop();
 			break;
 		} else if(!strncasecmp("DRAW", cmd, 4)) {
 			writeout("DRAWN\n");
@@ -130,8 +153,11 @@ parse(void) {
 		} else if(!strncasecmp("DUMP", cmd, 4)) {
 			writeout("CAN'T DUMP TREE YET\n");
 			break;
+		} else if(!strncasecmp("QUIT", cmd, 4)) {
+			quit();
+			break;
 		} else {
-			die("ERROR unknown command: %s\n", cmd);
+			writeout("ERROR unknown command: %s\n", cmd);
 		}
 		fflush(NULL);
 	}
@@ -147,7 +173,7 @@ run(void) {
 	for(;;) {
 		int i, nfds = 0;
 		fd_set rd;
-		struct timeval tv = { .tv_sec = PING_TIMEOUT / 3, .tv_usec = 0 };
+		struct timeval tv = { .tv_sec = PING_TIMEOUT / 5, .tv_usec = 0 };
 
 		FD_ZERO(&rd);
 		FD_SET(infd, &rd);
