@@ -6,22 +6,27 @@ swt - simple widget toolkit
 BNF:
 
 <commands> ::= <command> { ";" <command> }
-<command>  ::= <draw> | 
-               <dump> | 
-               <noop> | 
-               <quit>
-<dump>     ::= dump | 
-               dump id
-<noop>     ::= noop
+<command>  ::= <window>  | <add> | <show> | <dump> | <quit>
+<window>   ::= window <sp> <class> <sp> <name>
+
+<show>     ::= show <sp> <id> | show all
+
+<dump>     ::= dump | dump <sp> <id>
+
 <quit>     ::= quit
-<draw>     ::= draw <widgets>
-<widgets>  ::= <widget> { <widget> }
-<widget>   ::= <hbox> | 
-               <vbox> | 
-               <frame> | 
-               <label> | 
-               <embed>
-<hbox>     ::= hbox "(" <widgets> ")"
+
+<add>      ::= add <sp> <parent> <sp> <widget>
+
+<widget>   ::= <hbox> | <vbox> | <embed>
+
+<hbox>     ::= hbox <sp> <id> <sp> <widget-attributes>
+<vbox>     ::= vbox <sp> <id> <sp> <widget-attributes>
+<embed>    ::= embed <sp> <xid>
+<class>    ::= <string>
+<name>     ::= <id>
+<id>       ::= <string>
+<string>   ::= <letter> { <letter> | <digit> }
+<sp>       ::= " "
 
 
 Installation
