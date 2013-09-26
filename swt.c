@@ -17,6 +17,8 @@
 #include <stdbool.h>
 #include <libgen.h>
 
+#include "drw.h"
+#include "util.h"
 #include "arg.h"
 
 #ifndef PIPE_BUF
@@ -25,13 +27,16 @@
 
 #define PING_TIMEOUT 300
 
-#define MAX(A, B)               ((A) > (B) ? (A) : (B))
-
+static void closefifo(void);
 static void createfifo(void);
 static void createout(void);
-static void die(const char *errstr, ...);
+static void dumptree(void);
 static void noop(void);
-static void parse(void);
+static void procinput(void);
+static void procadd(char *attrs);
+static void procremove(char *attrs);
+static void procshow(char *attrs);
+static void procwindow(char *attrs);
 static void resetfifo(void);
 static void run(void);
 static void usage(void);
@@ -40,42 +45,133 @@ static void writeout(const char *msg, ...);
 
 char *argv0;
 
-static int infd;
+static int infd = -1;
+static int winfd = -1; /* don't write here, it prevents EOF */
 static FILE *outfile;
 static char *in = NULL, *out = NULL;
 
-static void
-die(const char *errstr, ...) {
-	va_list ap;
-
-	va_start(ap, errstr);
-	vfprintf(stderr, errstr, ap);
-	va_end(ap);
-	exit(EXIT_FAILURE);
-}
-
-static void
-writeout(const char *msg, ...) {
-	va_list ap;
-
-	va_start(ap, msg);
-	vfprintf(outfile, msg, ap);
-	va_end(ap);
-
-	fflush(outfile);
-}
-
-static void
-usage(void) {
-	die("usage: %s [-v] -i <infifo> -o <outfile>\n", basename(argv0));
-}
-
-static void
-quit(void) {
-	if(close(infd) == -1) {
-		perror("unable to close fifo");
+void
+closefifo(void) {
+	if(close(winfd) == -1) {
+		perror("unable to close O_WRONLY fifo");
 		exit(EXIT_FAILURE);
 	}
+
+	if(close(infd) == -1) {
+		perror("unable to close O_RDONLY fifo");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void
+createfifo(void) {
+	if(access(in, F_OK) == -1)
+		mkfifo(in, S_IRWXU);
+
+	if((infd = open(in, O_RDONLY | O_NONBLOCK, 0)) == -1) {
+		perror("unable to open input fifo for reading");
+		quit();
+	}
+	if((winfd = open(in, O_WRONLY, 0)) == -1) {
+		perror("unable to open input fifo for writting");
+		quit();
+	}
+}
+
+void
+createout(void) {
+	if(!(outfile = fopen(out, "a"))) {
+		perror("unable to open output file");
+		exit(EXIT_FAILURE);
+	}
+}
+
+void
+dumptree(void) {
+	writeout("CAN'T DUMP TREE YET\n");
+}
+
+void
+noop(void) {
+	time_t t;
+
+	t = time(NULL);
+	writeout("NOOP %lu\n", t);
+}
+
+void
+procinput(void) {
+	size_t len = -1;
+	char *input;
+	char buf[PIPE_BUF];
+
+	if((len = read(infd, buf, PIPE_BUF)) == -1) {
+		perror("failed to read from pipe");
+	}
+
+	if(len > 0) {
+		buf[len - 1] = '\0';
+	} else {
+		resetfifo();
+		return;
+	}
+
+	for(input = buf;;input = NULL) {
+		char *command = NULL, *attributes = NULL;
+
+		command = strtok(input, ";");
+		if(command == NULL)
+			break;
+
+		if((attributes = strchr(command, ' '))) {
+			*(attributes++) = '\0';
+		} else {
+			if(strcasecmp("noop", command) == 0) {
+				noop();
+			} else if(strcasecmp("dump", command) == 0) {
+				dumptree();
+			} else if(strcasecmp("quit", command) == 0) {
+				quit();
+			} else 
+				writeout("ERROR parsing command: %s\n", command);
+			continue;
+		}
+
+		if(strcasecmp("window", command) == 0) {
+			procwindow(attributes);
+		} else if(strcasecmp("add", command) == 0) {
+			procadd(attributes);
+		} else if(strcasecmp("show", command) == 0) {
+			procshow(attributes);
+		} else if(strcasecmp("remove", command) == 0) {
+			procremove(attributes);
+		} else {
+			writeout("ERROR unknown command: %s(%s)\n", command, attributes);
+		}
+		fflush(NULL);
+	}
+}
+
+void
+procadd(char *attrs) {
+}
+
+void
+procremove(char *attrs) {
+}
+
+void
+procshow(char *attrs) {
+}
+
+void
+procwindow(char *attrs) {
+	writeout("window request processing: %s\n", attrs);
+}
+
+void
+quit(void) {
+	closefifo();
 
 	writeout("done\n");
 
@@ -87,84 +183,13 @@ quit(void) {
 	exit(EXIT_SUCCESS);
 }
 
-static void
-createfifo(void) {
-	if(access(in, F_OK) == -1)
-		mkfifo(in, S_IRWXU);
-
-	if((infd = open(in, O_RDONLY | O_NONBLOCK, 0)) == -1) {
-		perror("unable to open input fifo");
-		exit(EXIT_FAILURE);
-	}
-}
-
-static void
+void
 resetfifo(void) {
-	if(close(infd) == -1) {
-		perror("unable to close fifo");
-		exit(EXIT_FAILURE);
-	} 
-
+	closefifo();
 	createfifo();
 }
 
-static void
-createout(void) {
-	if(!(outfile = fopen(out, "a"))) {
-		perror("unable to open output file");
-		exit(EXIT_FAILURE);
-	}
-}
-
-static void
-noop(void) {
-	time_t t;
-
-	t = time(NULL);
-	writeout("NOOP %lu\n", t);
-}
-
-static void
-parse(void) {
-	int len = -1;
-	char *input;
-	char *cmd;
-	char buf[PIPE_BUF];
-
-	if((len = read(infd, buf, PIPE_BUF)) == -1) {
-		perror("failed to read from pipe");
-	}
-
-	if(len == 0) {
-		resetfifo();
-		return;
-	}
-
-	for(input = buf;;input = NULL) {
-		cmd = strtok(input, " ");
-		if(cmd == NULL)
-			break;
-		if(!strncasecmp("NOOP", cmd, 4)) {
-			noop();
-			break;
-		} else if(!strncasecmp("DRAW", cmd, 4)) {
-			writeout("DRAWN\n");
-			break;
-		} else if(!strncasecmp("DUMP", cmd, 4)) {
-			writeout("CAN'T DUMP TREE YET\n");
-			break;
-		} else if(!strncasecmp("QUIT", cmd, 4)) {
-			quit();
-			break;
-		} else {
-			writeout("ERROR unknown command: %s\n", cmd);
-		}
-		fflush(NULL);
-	}
-}
-
-
-static void
+void
 run(void) {
 	time_t last_response;
 
@@ -195,10 +220,26 @@ run(void) {
 		} else {
 			if(FD_ISSET(infd, &rd)) {
 				last_response = time(NULL);
-				parse();
+				procinput();
 			}
 		}
 	}
+}
+
+void
+usage(void) {
+	die("usage: %s [-v] -i <infifo> -o <outfile>\n", basename(argv0));
+}
+
+void
+writeout(const char *msg, ...) {
+	va_list ap;
+
+	va_start(ap, msg);
+	vfprintf(outfile, msg, ap);
+	va_end(ap);
+
+	fflush(outfile);
 }
 
 int
