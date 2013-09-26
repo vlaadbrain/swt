@@ -2,7 +2,7 @@
 
 include config.mk
 
-SRC = swt.c
+SRC = drw.c swt.c util.c
 OBJ = ${SRC:.c=.o}
 
 all: options swt
