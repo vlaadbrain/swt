@@ -14,6 +14,7 @@
 #include <libgen.h>
 #include <X11/cursorfont.h>
 #include <X11/Xutil.h>
+#include <X11/XKBlib.h>
 
 #include "drw.h"
 #include "util.h"
@@ -25,15 +26,31 @@
 
 #define PING_TIMEOUT 300
 
+#define LENGTH(x)                (sizeof((x)) / sizeof(*(x)))
+#define CLEANMASK(mask)          (mask & (MODKEY))
+
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel, SchemeLast }; /* color schemes */
 
+typedef union {
+	int i;
+	const void *v;
+} Arg;
+
+typedef struct {
+	unsigned int mod;
+	KeySym keysym;
+	void (*func)(const Arg *);
+	const Arg arg;
+} Key;
 
 static void buttonpress(const XEvent *ev);
 static void closefifo(void);
 static void createfifo(void);
 static void createout(void);
 static void dumptree(void);
+static void expose(const XEvent *ev);
+static void killclient(const Arg *arg);
 static void keypress(const XEvent *ev);
 static void noop(void);
 static void procinput(void);
@@ -60,6 +77,7 @@ static int screen;
 static void (*handler[LASTEvent]) (const XEvent *) = {
 	[ButtonPress] = buttonpress,
 	[KeyPress] = keypress,
+	[Expose] = expose,
 };
 
 static int sw, sh, wx, wy, ww, wh;
@@ -122,8 +140,28 @@ dumptree(void) {
 }
 
 void
-keypress(const XEvent *ev) {
-	writeout("key pressed\n");
+expose(const XEvent *ev) {
+	writeout("exposed\n");
+}
+
+void
+keypress(const XEvent *e) {
+	const XKeyEvent *ev = &e->xkey;
+	unsigned int i;
+	KeySym keysym;
+
+	keysym = XkbKeycodeToKeysym(dpy, (KeyCode)ev->keycode, 0, 0);
+	for(i = 0; i < LENGTH(keys); i++) {
+		if(keysym == keys[i].keysym
+				&& CLEANMASK(keys[i].mod) == CLEANMASK(ev->state)
+				&& keys[i].func) {
+			keys[i].func(&(keys[i].arg));
+		}
+	}
+}
+
+void
+killclient(const Arg *arg) {
 }
 
 void
@@ -202,18 +240,12 @@ procshow(char *attrs) {
 void
 procwindow(char *attrs) {
 	writeout("window request processing: %s\n", attrs);
-	XClassHint class_hint;
 
 	window = XCreateSimpleWindow(dpy, root, wx, wy, ww, wh, 0,
 			scheme[SchemeNorm].fg->rgb, scheme[SchemeNorm].bg->rgb);
-	XSelectInput(dpy, window, ButtonPressMask|KeyPressMask);
-
-	class_hint.res_name = "SWT";
-	class_hint.res_class = attrs;
-
-	XSetClassHint(dpy, window, &class_hint);
-
 	XMapWindow(dpy, window);
+
+	XSelectInput(dpy, window, ExposureMask|KeyPressMask|ButtonPressMask);
 	XSync(dpy, False);
 }
 

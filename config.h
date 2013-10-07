@@ -9,3 +9,8 @@ static const char selbordercolor[]  = "#cb4b16";
 static const char selbgcolor[]      = "#073642";
 static const char selfgcolor[]      = "#93a1a1";
 
+#define MODKEY ControlMask
+static Key keys[] = { \
+	/* modifier                     key        function        argument */
+	{ MODKEY,                       XK_q,      killclient,     { 0 } },
+};
