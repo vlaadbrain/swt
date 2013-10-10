@@ -1,4 +1,5 @@
-/* * See LICENSE file for copyright and license details.  */ #include <errno.h>
+/* * See LICENSE file for copyright and license details.  */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
