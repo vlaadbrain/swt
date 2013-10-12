@@ -52,7 +52,6 @@ static void createfifo(void);
 static void createout(void);
 static void dumptree(void);
 static void expose(const XEvent *ev);
-static void killclient(const Arg *arg);
 static void keypress(const XEvent *ev);
 static void noop(void);
 static void procinput(void);
@@ -65,7 +64,7 @@ static void resetfifo(void);
 static void run(void);
 static void setup(void);
 static void usage(void);
-static void quit(void);
+static void quit(const Arg *arg);
 static void writeout(const char *msg, ...);
 
 /* variables */
@@ -85,6 +84,7 @@ static void (*handler[LASTEvent]) (const XEvent *) = {
 static int sw, sh, wx, wy, ww, wh;
 static FILE *outfile;
 static char *in = NULL, *out = NULL;
+static Bool running = True;
 static Display *dpy;
 static Window root, window;
 static Drw *drw;
@@ -156,10 +156,6 @@ keypress(const XEvent *e) {
 }
 
 void
-killclient(const Arg *arg) {
-}
-
-void
 noop(void) {
 	time_t t;
 
@@ -199,7 +195,7 @@ procinput(void) {
 			} else if(strcasecmp("dump", command) == 0) {
 				dumptree();
 			} else if(strcasecmp("quit", command) == 0) {
-				quit();
+				quit(NULL);
 			} else
 				writeout("ERROR parsing command: %s\n", command);
 			continue;
@@ -256,18 +252,8 @@ procx11events(void) {
 }
 
 void
-quit(void) {
-	closefifo();
-
-	writeout("done\n");
-
-	if(fclose(outfile) == -1) {
-		perror("unable to close outfile");
-	}
-
-	cleanup();
-	XCloseDisplay(dpy);
-	exit(EXIT_SUCCESS);
+quit(const Arg *arg) {
+	running = False;
 }
 
 void
@@ -287,6 +273,8 @@ run(void) {
 		int i, nfds = 0;
 		fd_set rd;
 		struct timeval tv = { .tv_sec = PING_TIMEOUT / 5, .tv_usec = 0 };
+
+		if (!running) break;
 
 		FD_ZERO(&rd);
 		FD_SET(infd, &rd);
@@ -403,6 +391,14 @@ main(int argc, char *argv[]) {
 	createfifo();
 	createout();
 	run();
-	quit();
+	closefifo();
+
+	writeout("done\n");
+	if(fclose(outfile) == -1) {
+		perror("unable to close outfile");
+	}
+	cleanup();
+	XCloseDisplay(dpy);
+	return EXIT_SUCCESS;
 }
 
