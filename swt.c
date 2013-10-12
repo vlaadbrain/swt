@@ -46,6 +46,7 @@ typedef struct {
 } Key;
 
 static void buttonpress(const XEvent *ev);
+static void cleanup(void);
 static void closefifo(void);
 static void createfifo(void);
 static void createout(void);
@@ -89,7 +90,7 @@ static Window root, window;
 static Drw *drw;
 static Fnt *fnt;
 static Cur *cursor[CurLast];
-static ClrScheme scheme[SchemeLast]; 
+static ClrScheme scheme[SchemeLast];
 
 #include "config.h"
 
@@ -100,15 +101,8 @@ buttonpress(const XEvent *ev) {
 
 void
 closefifo(void) {
-	if(close(winfd) == -1) {
-		perror("unable to close O_WRONLY fifo");
-		exit(EXIT_FAILURE);
-	}
-
-	if(close(infd) == -1) {
-		perror("unable to close O_RDONLY fifo");
-		exit(EXIT_FAILURE);
-	}
+	close(winfd);
+	close(infd);
 }
 
 void
@@ -118,12 +112,12 @@ createfifo(void) {
 
 	if((infd = open(in, O_RDONLY | O_NONBLOCK, 0)) == -1) {
 		perror("unable to open input fifo for reading");
-		quit();
+		exit(EXIT_FAILURE);
 	}
 
 	if((winfd = open(in, O_WRONLY, 0)) == -1) {
 		perror("unable to open input fifo for writting");
-		quit();
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -206,7 +200,7 @@ procinput(void) {
 				dumptree();
 			} else if(strcasecmp("quit", command) == 0) {
 				quit();
-			} else 
+			} else
 				writeout("ERROR parsing command: %s\n", command);
 			continue;
 		}
@@ -269,9 +263,10 @@ quit(void) {
 
 	if(fclose(outfile) == -1) {
 		perror("unable to close outfile");
-		exit(EXIT_FAILURE);
 	}
 
+	cleanup();
+	XCloseDisplay(dpy);
 	exit(EXIT_SUCCESS);
 }
 
@@ -324,7 +319,8 @@ run(void) {
 	}
 }
 
-void setup(void) {
+void
+setup(void) {
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
 	fnt = drw_font_create(dpy, font);
@@ -347,6 +343,23 @@ void setup(void) {
 	scheme[SchemeSel].border = drw_clr_create(drw, selbordercolor);
 	scheme[SchemeSel].bg = drw_clr_create(drw, selbgcolor);
 	scheme[SchemeSel].fg = drw_clr_create(drw, selfgcolor);
+}
+
+void
+cleanup(void) {
+	drw_clr_free(scheme[SchemeNorm].border);
+	drw_clr_free(scheme[SchemeNorm].bg);
+	drw_clr_free(scheme[SchemeNorm].fg);
+	drw_clr_free(scheme[SchemeSel].border);
+	drw_clr_free(scheme[SchemeSel].bg);
+	drw_clr_free(scheme[SchemeSel].fg);
+
+	drw_cur_free(drw, cursor[CurNormal]);
+	drw_cur_free(drw, cursor[CurResize]);
+	drw_cur_free(drw, cursor[CurMove]);
+
+	drw_font_free(dpy, fnt);
+	drw_free(drw);
 }
 
 void
@@ -390,7 +403,6 @@ main(int argc, char *argv[]) {
 	createfifo();
 	createout();
 	run();
-	XCloseDisplay(dpy);
-	return EXIT_SUCCESS;
+	quit();
 }
 
