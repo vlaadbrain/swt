@@ -12,5 +12,5 @@ static const char selfgcolor[]      = "#93a1a1";
 #define MODKEY ControlMask
 static Key keys[] = { \
 	/* modifier                     key        function        argument */
-	{ MODKEY,                       XK_q,      killclient,     { 0 } },
+	{ MODKEY,                       XK_q,      quit,           { 0 } },
 };
