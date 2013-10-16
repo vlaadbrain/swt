@@ -305,10 +305,15 @@ run(void) {
 			}
 		}
 	}
+
+	writeout("done\n");
 }
 
 void
 setup(void) {
+	createfifo();
+	createout();
+
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
 	fnt = drw_font_create(dpy, font);
@@ -318,6 +323,7 @@ setup(void) {
 	wy = 0;
 	ww = 800;
 	wh = 600;
+
 	drw = drw_create(dpy, screen, root, sw, sh);
 	drw_setfont(drw, fnt);
 
@@ -348,6 +354,12 @@ cleanup(void) {
 
 	drw_font_free(dpy, fnt);
 	drw_free(drw);
+
+	closefifo();
+
+	if(fclose(outfile) == -1) {
+		perror("unable to close outfile");
+	}
 }
 
 void
@@ -388,16 +400,9 @@ main(int argc, char *argv[]) {
 		die("swt: cannot open display\n");
 
 	setup();
-	createfifo();
-	createout();
 	run();
-	closefifo();
-
-	writeout("done\n");
-	if(fclose(outfile) == -1) {
-		perror("unable to close outfile");
-	}
 	cleanup();
+
 	XCloseDisplay(dpy);
 	return EXIT_SUCCESS;
 }
