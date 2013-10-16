@@ -11,13 +11,14 @@ Edit config.mk to match your local setup. swt is installed into
 Afterwards enter the following command to build and install swt  
 (if necessary as root): 
 
-    $ make install 
+    make install 
 
 
 Running swt
 -----------
 Simply invoke  
-	'swt -i <inputfile> -o <outputfile> ' 
+
+	swt -i <inputfile> -o <outputfile>
 
 you can interact with swt using both of those files and the commads above.  
 The intention is that the gui is driven by potentially any language.  
@@ -40,6 +41,7 @@ Commands
 	<hbox>     ::= hbox <sp> <id> <sp> <widget-attributes>  
 	<vbox>     ::= vbox <sp> <id> <sp> <widget-attributes>  
 	<embed>    ::= embed <sp> <xid>  
+	...
 	<class>    ::= <string>  
 	<name>     ::= <id>  
 	<id>       ::= <string>  
