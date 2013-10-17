@@ -16,8 +16,8 @@ Afterwards enter the following command to build and install swt
 
 Running swt
 -----------
-Simply invoke the 'swt -i <inputfile> -o <outputfile> ' command with the  
-required arguments. 
+Simply invoke
+	'swt -i <inputfile> -o <outputfile> ' 
 
 you can interact with swt using both of those files and the commads above.  
 The intention is that the gui is driven by potentially any language.  
