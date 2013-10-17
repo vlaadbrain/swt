@@ -16,7 +16,7 @@ Afterwards enter the following command to build and install swt
 
 Running swt
 -----------
-Simply invoke
+Simply invoke  
 	'swt -i <inputfile> -o <outputfile> ' 
 
 you can interact with swt using both of those files and the commads above.  
