@@ -20,7 +20,7 @@ Simply invoke
 
 	swt -i <inputfile> -o <outputfile>
 
-you can interact with swt using both of those files and the commads above.  
+you can interact with swt using both of those files and the commads below.  
 The intention is that the gui is driven by potentially any language.  
 
 Commands
@@ -30,7 +30,7 @@ Commands
 
 	<commands> ::= <command> { ";" <command> }  
 	<command>  ::= <window>  | <add> | <show> | <dump> | <quit>  
-	<window>   ::= window <sp> <class> <sp> <name>  
+	<window>   ::= window <sp> <name>  
 		returns "window <id>"  
 	<show>     ::= show <sp> <id> | show all  
 	<dump>     ::= dump <sp> all | dump <sp> <id>  

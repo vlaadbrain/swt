@@ -15,6 +15,7 @@
 #include <libgen.h>
 #include <X11/cursorfont.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <X11/XKBlib.h>
 
 #include "drw.h"
@@ -196,6 +197,8 @@ procinput(void) {
 				dumptree();
 			} else if(strcasecmp("quit", command) == 0) {
 				quit(NULL);
+			} else if(strcasecmp("window", command) == 0) {
+				procwindow(NULL);
 			} else
 				writeout("ERROR parsing command: %s\n", command);
 			continue;
@@ -230,14 +233,35 @@ procshow(char *attrs) {
 
 void
 procwindow(char *attrs) {
-	writeout("window request processing: %s\n", attrs);
+	char *name = NULL, *title = NULL;
+	XClassHint class_hint;
+	XTextProperty xtp;
+
+	name = attrs ? attrs : "swt";
+	if(attrs && (title = strchr(attrs, ' '))) {
+		*(title++) = '\0';
+	} else {
+		title = "swt window";
+	}
 
 	window = XCreateSimpleWindow(dpy, root, wx, wy, ww, wh, 0,
 			scheme[SchemeNorm].fg->rgb, scheme[SchemeNorm].bg->rgb);
+	XSelectInput(dpy, window, ExposureMask|KeyPressMask|ButtonPressMask);
+
+	class_hint.res_name = name;
+	class_hint.res_class = "SWT";
+	XSetClassHint(dpy, window, &class_hint);
+
+	if(XmbTextListToTextProperty(dpy, (char **)&title, 1, XCompoundTextStyle,
+				&xtp) == Success) {
+		XSetTextProperty(dpy, window, &xtp, XA_WM_NAME);
+		XFree(xtp.value);
+	}
+
 	XMapWindow(dpy, window);
 
-	XSelectInput(dpy, window, ExposureMask|KeyPressMask|ButtonPressMask);
 	XSync(dpy, False);
+	writeout("window %s\n", name);
 }
 
 void
