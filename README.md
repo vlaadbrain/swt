@@ -49,6 +49,8 @@ Commands
 
 Customizations
 --------------
+(cp config.def.h config.h || make) && $EDITOR config.h && make;
+
 Like most simple projects swt doesn't provide some fancy interface  
 to *theme* the widget toolkit.  The best interface for that is your  
 favorite text editor pointed at config.h; and recompile...  
