@@ -96,8 +96,10 @@ static ClrScheme scheme[SchemeLast];
 #include "config.h"
 
 void
-buttonpress(const XEvent *ev) {
-	writeout("button pressed\n");
+buttonpress(const XEvent *e) {
+	const XButtonPressedEvent *ev = &e->xbutton;
+
+	writeout("button pressed: %d (%d,%d)\n", ev->button, ev->x, ev->y);
 }
 
 void
@@ -261,7 +263,7 @@ procwindow(char *attrs) {
 	XMapWindow(dpy, window);
 
 	XSync(dpy, False);
-	writeout("window %s\n", name);
+	writeout("window %s %lu\n", name, window);
 }
 
 void

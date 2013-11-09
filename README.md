@@ -31,21 +31,20 @@ Commands
 	<commands> ::= <command> { ";" <command> }  
 	<command>  ::= <window>  | <add> | <show> | <dump> | <quit>  
 	<window>   ::= window <sp> <name>  
-		returns "window <id>"  
-	<show>     ::= show <sp> <id> | show all  
-	<dump>     ::= dump <sp> all | dump <sp> <id>  
+		returns "window <name> <xid>"  
+	<show>     ::= show <sp> <name> | show all  
+	<dump>     ::= dump <sp> all | dump <sp> <name>  
 	<quit>     ::= quit  
 	<add>      ::= add <sp> <parent> <sp> <widget>  
-	<parent>   ::= <id>  
+	<parent>   ::= <name>  
 	<widget>   ::= <hbox> | <vbox> | <embed>  
-	<hbox>     ::= hbox <sp> <id> <sp> <widget-attributes>  
-	<vbox>     ::= vbox <sp> <id> <sp> <widget-attributes>  
+	<hbox>     ::= hbox <sp> <name> <sp> <widget-attributes>  
+	<vbox>     ::= vbox <sp> <name> <sp> <widget-attributes>  
 	<embed>    ::= embed <sp> <xid>  
 	...
-	<class>    ::= <string>  
-	<name>     ::= <id>  
-	<id>       ::= <string>  
-	<string>   ::= <letter> { <letter> | <digit> }  
+	<name>     ::= <alpha-num>  
+	<xid>      ::= <unsignedlong>  
+	<alpha-num>::= <letter> | <digit> { <letter> | <digit> }  
 	<sp>       ::= " "  
 
 Customizations
@@ -53,7 +52,6 @@ Customizations
 Like most simple projects swt doesn't provide some fancy interface  
 to *theme* the widget toolkit.  The best interface for that is your  
 favorite text editor pointed at config.h; and recompile...  
-
 
 Gratitudes
 ----------
