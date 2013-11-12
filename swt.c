@@ -52,7 +52,6 @@ typedef struct {
 	char title[256];
 } SwtWindow;
 
-static void buttonpress(const XEvent *ev);
 static void cleanup(void);
 static void closefifo(void);
 static void closewindow(const Arg *arg);
@@ -89,7 +88,6 @@ static int x11fd = -1;
 
 static int screen;
 static void (*handler[LASTEvent]) (const XEvent *) = {
-	[ButtonPress] = buttonpress,
 	[KeyPress] = keypress,
 	[FocusIn] = focusin,
 	[DestroyNotify] = destroynotify,
@@ -110,13 +108,6 @@ static Cur *cursor[CurLast];
 static ClrScheme scheme[SchemeLast];
 
 #include "config.h"
-
-void
-buttonpress(const XEvent *e) {
-	const XButtonPressedEvent *ev = &e->xbutton;
-
-	writeout("button pressed: %d (%d,%d)\n", ev->button, ev->x, ev->y);
-}
 
 void
 closefifo(void) {
