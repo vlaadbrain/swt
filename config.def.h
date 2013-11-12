@@ -13,4 +13,5 @@ static const char selfgcolor[]      = "#eeeeee";
 static Key keys[] = { \
 	/* modifier                     key        function        argument */
 	{ MODKEY,                       XK_q,      quit,           { 0 } },
+	{ MODKEY,                       XK_c,      closewindow,    { 0 } },
 };

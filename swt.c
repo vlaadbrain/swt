@@ -46,13 +46,24 @@ typedef struct {
 	const Arg arg;
 } Key;
 
+typedef struct {
+	Window win;
+	char name[256];
+	char title[256];
+} SwtWindow;
+
 static void buttonpress(const XEvent *ev);
 static void cleanup(void);
 static void closefifo(void);
+static void closewindow(const Arg *arg);
 static void createfifo(void);
 static void createout(void);
+static void destroynotify(const XEvent *ev);
 static void dumptree(void);
-static void expose(const XEvent *ev);
+static void dumpwindow(SwtWindow *w);
+static void *emallocz(size_t size);
+static void *erealloc(void *o, size_t size);
+static void focusin(const XEvent *ev);
 static void keypress(const XEvent *ev);
 static void noop(void);
 static void procinput(void);
@@ -63,6 +74,7 @@ static void procwindow(char *attrs);
 static void procx11events(void);
 static void resetfifo(void);
 static void run(void);
+static int  getwindow(Window w);
 static void setup(void);
 static void usage(void);
 static void quit(const Arg *arg);
@@ -79,7 +91,8 @@ static int screen;
 static void (*handler[LASTEvent]) (const XEvent *) = {
 	[ButtonPress] = buttonpress,
 	[KeyPress] = keypress,
-	[Expose] = expose,
+	[FocusIn] = focusin,
+	[DestroyNotify] = destroynotify,
 };
 
 static int sw, sh, wx, wy, ww, wh;
@@ -87,7 +100,10 @@ static FILE *outfile;
 static char *in = NULL, *out = NULL;
 static Bool running = True;
 static Display *dpy;
-static Window root, window;
+static Window root;
+static SwtWindow **windows;
+static int nwindows = 0;
+static int sel = -1;
 static Drw *drw;
 static Fnt *fnt;
 static Cur *cursor[CurLast];
@@ -109,17 +125,23 @@ closefifo(void) {
 }
 
 void
+closewindow(const Arg *arg) {
+	if(sel < 0) return;
+	XDestroyWindow(dpy, windows[sel]->win);
+}
+
+void
 createfifo(void) {
 	if(access(in, F_OK) == -1)
 		mkfifo(in, S_IRWXU);
 
 	if((infd = open(in, O_RDONLY | O_NONBLOCK, 0)) == -1) {
-		perror("unable to open input fifo for reading");
+		perror("swt unable to open input fifo for reading");
 		exit(EXIT_FAILURE);
 	}
 
 	if((winfd = open(in, O_WRONLY, 0)) == -1) {
-		perror("unable to open input fifo for writting");
+		perror("swt unable to open input fifo for writting");
 		exit(EXIT_FAILURE);
 	}
 }
@@ -127,19 +149,112 @@ createfifo(void) {
 void
 createout(void) {
 	if(!(outfile = fopen(out, "a"))) {
-		perror("unable to open output file");
+		perror("swt unable to open output file");
 		exit(EXIT_FAILURE);
+	}
+}
+
+SwtWindow *
+createwindow(char *name, char *title) {
+	XClassHint class_hint;
+	XTextProperty xtp;
+	SwtWindow *swtwin;
+
+	swtwin = emallocz(sizeof(*swtwin));
+
+	swtwin->win = XCreateSimpleWindow(dpy, root, wx, wy, ww, wh, 0,
+			scheme[SchemeNorm].fg->rgb, scheme[SchemeNorm].bg->rgb);
+	XSelectInput(dpy, swtwin->win, KeyPressMask|ButtonPressMask|StructureNotifyMask|FocusChangeMask);
+
+	class_hint.res_name = name;
+	class_hint.res_class = "SWT";
+	XSetClassHint(dpy, swtwin->win, &class_hint);
+
+	if(XmbTextListToTextProperty(dpy, (char **)&title, 1, XCompoundTextStyle,
+				&xtp) == Success) {
+		XSetTextProperty(dpy, swtwin->win, &xtp, XA_WM_NAME);
+		XFree(xtp.value);
+	}
+
+	strncpy(swtwin->name, name, sizeof(swtwin->name)-1);
+	swtwin->name[sizeof(swtwin->name)-1] = '\0';
+	strncpy(swtwin->title, title, sizeof(swtwin->title)-1);
+	swtwin->title[sizeof(swtwin->title)-1] = '\0';
+
+	nwindows++;
+	windows = erealloc(windows, sizeof(SwtWindow *) * nwindows);
+
+	windows[nwindows - 1] = swtwin;
+
+	return swtwin;
+}
+
+void
+destroynotify(const XEvent *e) {
+	const XDestroyWindowEvent *ev = &e->xdestroywindow;
+	int w = getwindow(ev->window);
+
+	if(!nwindows) {
+		return;
+	} else if(w == 0) {
+		/* First client. */
+		nwindows--;
+		free(windows[0]);
+		memmove(&windows[0], &windows[1], sizeof(SwtWindow *) * nwindows);
+	} else if(w == nwindows - 1) {
+		/* Last client. */
+		nwindows--;
+		free(windows[w]);
+		windows = erealloc(windows, sizeof(SwtWindow *) * nwindows);
+	} else {
+		/* Somewhere inbetween. */
+		free(windows[w]);
+		memmove(&windows[w], &windows[w+1],
+				sizeof(SwtWindow *) * (nwindows - (w + 1)));
+		nwindows--;
 	}
 }
 
 void
 dumptree(void) {
-	writeout("CAN'T DUMP TREE YET\n");
+	for(int i=0; i<nwindows;i++) {
+		dumpwindow(windows[i]);
+	}
 }
 
 void
-expose(const XEvent *ev) {
-	writeout("exposed\n");
+dumpwindow(SwtWindow *w) {
+	writeout("window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
+}
+
+void *
+emallocz(size_t size) {
+	void *p;
+
+	if(!(p = calloc(1, size)))
+		die("swt cannot malloc\n");
+	return p;
+}
+
+void *
+erealloc(void *o, size_t size) {
+	void *p;
+
+	if(!(p = realloc(o, size)))
+		die("swt cannot realloc\n");
+	return p;
+}
+
+void
+focusin(const XEvent *e) {
+	const XFocusChangeEvent *ev = &e->xfocus;
+	int dummy;
+	Window focused;
+
+	if(ev->mode != NotifyUngrab) {
+		XGetInputFocus(dpy, &focused, &dummy);
+		sel = getwindow(focused);
+	}
 }
 
 void
@@ -173,7 +288,7 @@ procinput(void) {
 	char buf[PIPE_BUF];
 
 	if((len = read(infd, buf, PIPE_BUF)) == -1) {
-		perror("failed to read from pipe");
+		perror("swt failed to read from pipe");
 	}
 
 	if(len > 0) {
@@ -236,8 +351,7 @@ procshow(char *attrs) {
 void
 procwindow(char *attrs) {
 	char *name = NULL, *title = NULL;
-	XClassHint class_hint;
-	XTextProperty xtp;
+	SwtWindow *sw;
 
 	name = attrs ? attrs : "swt";
 	if(attrs && (title = strchr(attrs, ' '))) {
@@ -246,24 +360,12 @@ procwindow(char *attrs) {
 		title = "swt window";
 	}
 
-	window = XCreateSimpleWindow(dpy, root, wx, wy, ww, wh, 0,
-			scheme[SchemeNorm].fg->rgb, scheme[SchemeNorm].bg->rgb);
-	XSelectInput(dpy, window, ExposureMask|KeyPressMask|ButtonPressMask);
+	sw = createwindow(name, title);
 
-	class_hint.res_name = name;
-	class_hint.res_class = "SWT";
-	XSetClassHint(dpy, window, &class_hint);
-
-	if(XmbTextListToTextProperty(dpy, (char **)&title, 1, XCompoundTextStyle,
-				&xtp) == Success) {
-		XSetTextProperty(dpy, window, &xtp, XA_WM_NAME);
-		XFree(xtp.value);
-	}
-
-	XMapWindow(dpy, window);
+	XMapWindow(dpy, sw->win);
 
 	XSync(dpy, False);
-	writeout("window %s %lu\n", name, window);
+	writeout("window %s %lu\n", sw->name, sw->win);
 }
 
 void
@@ -313,7 +415,7 @@ run(void) {
 		if(i == -1 && errno == EINTR) continue;
 
 		if(i == -1) {
-			perror("swt: error on select()");
+			perror("swt error on select()");
 			exit(EXIT_FAILURE);
 		} else if(i == 0) {
 			if(time(NULL) - last_response >= PING_TIMEOUT) {
@@ -333,6 +435,16 @@ run(void) {
 	}
 
 	writeout("done\n");
+}
+
+int
+getwindow(Window w) {
+	for(int i=0;i<nwindows;i++) {
+		if(w == windows[i]->win) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 void
@@ -384,7 +496,7 @@ cleanup(void) {
 	closefifo();
 
 	if(fclose(outfile) == -1) {
-		perror("unable to close outfile");
+		perror("swt unable to close outfile");
 	}
 }
 
@@ -423,7 +535,7 @@ main(int argc, char *argv[]) {
 	if(!in || !out) usage();
 
 	if(!(dpy = XOpenDisplay(NULL)))
-		die("swt: cannot open display\n");
+		die("swt cannot open display\n");
 
 	setup();
 	run();
