@@ -57,4 +57,4 @@ favorite text editor pointed at config.h; and recompile...
 
 Gratitudes
 ----------
-THANKS ii,tabbed ;)
+THANKS ii,tabbed,swk ;)
