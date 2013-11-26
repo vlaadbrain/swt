@@ -33,6 +33,7 @@
 
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel, SchemeLast }; /* color schemes */
+typedef enum { HorizBox, VertBox } BoxType;
 
 typedef union {
 	int i;
@@ -45,6 +46,18 @@ typedef struct {
 	void (*func)(const Arg *);
 	const Arg arg;
 } Key;
+
+typedef struct {
+	int x;
+	int y;
+	int w;
+	int h;
+} Rect;
+
+typedef struct {
+	BoxType type;
+	Rect r;
+} SwtBox;
 
 typedef struct {
 	Window win;
@@ -161,7 +174,7 @@ createwindow(char *name, char *title) {
 	class_hint.res_class = "SWT";
 	XSetClassHint(dpy, swtwin->win, &class_hint);
 
-	if(XmbTextListToTextProperty(dpy, (char **)&title, 1, XCompoundTextStyle,
+	if(XmbTextListToTextProperty(dpy, (char **)&title, 1, XUTF8StringStyle,
 				&xtp) == Success) {
 		XSetTextProperty(dpy, swtwin->win, &xtp, XA_WM_NAME);
 		XFree(xtp.value);
