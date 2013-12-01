@@ -63,9 +63,14 @@ typedef struct {
 	Window win;
 	char name[256];
 	char title[256];
+	Drw *drw;
+	Fnt *fnt;
+	Cur *cursor[CurLast];
+	ClrScheme scheme[SchemeLast];
 } SwtWindow;
 
 static void cleanup(void);
+static void cleanupwindow(SwtWindow *w);
 static void closefifo(void);
 static void closewindow(const Arg *arg);
 static void createfifo(void);
@@ -99,28 +104,50 @@ static int infd = -1;
 static int winfd = -1; /* don't write here, it prevents EOF */
 static int x11fd = -1;
 
-static int screen;
 static void (*handler[LASTEvent]) (const XEvent *) = {
 	[KeyPress] = keypress,
 	[FocusIn] = focusin,
 	[DestroyNotify] = destroynotify,
 };
 
-static int sw, sh, wx, wy, ww, wh;
 static FILE *outfile;
 static char *in = NULL, *out = NULL;
 static Bool running = True;
+static int screen;
 static Display *dpy;
 static Window root;
 static SwtWindow **windows;
 static int nwindows = 0;
 static int sel = -1;
-static Drw *drw;
-static Fnt *fnt;
-static Cur *cursor[CurLast];
-static ClrScheme scheme[SchemeLast];
 
 #include "config.h"
+
+void
+cleanup(void) {
+	closefifo();
+
+	if(fclose(outfile) == -1) {
+		perror("swt unable to close outfile");
+	}
+}
+
+void cleanupwindow(SwtWindow *w) {
+	drw_clr_free(w->scheme[SchemeNorm].border);
+	drw_clr_free(w->scheme[SchemeNorm].bg);
+	drw_clr_free(w->scheme[SchemeNorm].fg);
+	drw_clr_free(w->scheme[SchemeSel].border);
+	drw_clr_free(w->scheme[SchemeSel].bg);
+	drw_clr_free(w->scheme[SchemeSel].fg);
+
+	drw_cur_free(w->drw, w->cursor[CurNormal]);
+	drw_cur_free(w->drw, w->cursor[CurResize]);
+	drw_cur_free(w->drw, w->cursor[CurMove]);
+
+	drw_font_free(dpy, w->fnt);
+	drw_free(w->drw);
+
+	free(w);
+}
 
 void
 closefifo(void) {
@@ -166,8 +193,23 @@ createwindow(char *name, char *title) {
 
 	swtwin = emallocz(sizeof(*swtwin));
 
-	swtwin->win = XCreateSimpleWindow(dpy, root, wx, wy, ww, wh, 0,
-			scheme[SchemeNorm].fg->rgb, scheme[SchemeNorm].bg->rgb);
+	swtwin->drw = drw_create(dpy, screen, root, DisplayWidth(dpy, screen), DisplayHeight(dpy, screen));
+	swtwin->fnt = drw_font_create(dpy, font);
+	drw_setfont(swtwin->drw, swtwin->fnt);
+
+	swtwin->cursor[CurNormal] = drw_cur_create(swtwin->drw, XC_left_ptr);
+	swtwin->cursor[CurResize] = drw_cur_create(swtwin->drw, XC_sizing);
+	swtwin->cursor[CurMove] = drw_cur_create(swtwin->drw, XC_fleur);
+
+	swtwin->scheme[SchemeNorm].border = drw_clr_create(swtwin->drw, normbordercolor);
+	swtwin->scheme[SchemeNorm].bg = drw_clr_create(swtwin->drw, normbgcolor);
+	swtwin->scheme[SchemeNorm].fg = drw_clr_create(swtwin->drw, normfgcolor);
+	swtwin->scheme[SchemeSel].border = drw_clr_create(swtwin->drw, selbordercolor);
+	swtwin->scheme[SchemeSel].bg = drw_clr_create(swtwin->drw, selbgcolor);
+	swtwin->scheme[SchemeSel].fg = drw_clr_create(swtwin->drw, selfgcolor);
+	
+	swtwin->win = XCreateSimpleWindow(dpy, root, 0, 0, swtwin->drw->w, swtwin->drw->h, 0,
+			swtwin->scheme[SchemeNorm].fg->rgb, swtwin->scheme[SchemeNorm].bg->rgb);
 	XSelectInput(dpy, swtwin->win, KeyPressMask|ButtonPressMask|StructureNotifyMask|FocusChangeMask);
 
 	class_hint.res_name = name;
@@ -203,16 +245,16 @@ destroynotify(const XEvent *e) {
 	} else if(w == 0) {
 		/* First client. */
 		nwindows--;
-		free(windows[0]);
+		cleanupwindow(windows[0]);
 		memmove(&windows[0], &windows[1], sizeof(SwtWindow *) * nwindows);
 	} else if(w == nwindows - 1) {
 		/* Last client. */
 		nwindows--;
-		free(windows[w]);
+		cleanupwindow(windows[w]);
 		windows = erealloc(windows, sizeof(SwtWindow *) * nwindows);
 	} else {
 		/* Somewhere inbetween. */
-		free(windows[w]);
+		cleanupwindow(windows[w]);
 		memmove(&windows[w], &windows[w+1],
 				sizeof(SwtWindow *) * (nwindows - (w + 1)));
 		nwindows--;
@@ -458,50 +500,6 @@ setup(void) {
 
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
-	fnt = drw_font_create(dpy, font);
-	sw = DisplayWidth(dpy, screen);
-	sh = DisplayHeight(dpy, screen);
-	wx = 0;
-	wy = 0;
-	ww = 800;
-	wh = 600;
-
-	drw = drw_create(dpy, screen, root, sw, sh);
-	drw_setfont(drw, fnt);
-
-	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
-	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
-	cursor[CurMove] = drw_cur_create(drw, XC_fleur);
-
-	scheme[SchemeNorm].border = drw_clr_create(drw, normbordercolor);
-	scheme[SchemeNorm].bg = drw_clr_create(drw, normbgcolor);
-	scheme[SchemeNorm].fg = drw_clr_create(drw, normfgcolor);
-	scheme[SchemeSel].border = drw_clr_create(drw, selbordercolor);
-	scheme[SchemeSel].bg = drw_clr_create(drw, selbgcolor);
-	scheme[SchemeSel].fg = drw_clr_create(drw, selfgcolor);
-}
-
-void
-cleanup(void) {
-	drw_clr_free(scheme[SchemeNorm].border);
-	drw_clr_free(scheme[SchemeNorm].bg);
-	drw_clr_free(scheme[SchemeNorm].fg);
-	drw_clr_free(scheme[SchemeSel].border);
-	drw_clr_free(scheme[SchemeSel].bg);
-	drw_clr_free(scheme[SchemeSel].fg);
-
-	drw_cur_free(drw, cursor[CurNormal]);
-	drw_cur_free(drw, cursor[CurResize]);
-	drw_cur_free(drw, cursor[CurMove]);
-
-	drw_font_free(dpy, fnt);
-	drw_free(drw);
-
-	closefifo();
-
-	if(fclose(outfile) == -1) {
-		perror("swt unable to close outfile");
-	}
 }
 
 void
