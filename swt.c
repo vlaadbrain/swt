@@ -57,6 +57,8 @@ typedef struct {
 typedef struct {
 	BoxType type;
 	Rect r;
+	char name[256];
+	Bool hbox;
 } SwtBox;
 
 typedef struct {
@@ -69,18 +71,23 @@ typedef struct {
 	ClrScheme scheme[SchemeLast];
 } SwtWindow;
 
+static void addbox(SwtWindow *w, Bool hbox);
 static void cleanup(void);
 static void cleanupwindow(SwtWindow *w);
 static void closefifo(void);
 static void closewindow(const Arg *arg);
+static void configurenotify(const XEvent *ev);
 static void createfifo(void);
 static void createout(void);
 static void destroynotify(const XEvent *ev);
+static void draw(SwtWindow *w);
 static void dumptree(void);
 static void dumpwindow(SwtWindow *w);
 static void *emallocz(size_t size);
 static void *erealloc(void *o, size_t size);
 static void focusin(const XEvent *ev);
+static int  getwindow(Window w);
+static int  getwindowc(char *name);
 static void keypress(const XEvent *ev);
 static void noop(void);
 static void procinput(void);
@@ -90,11 +97,10 @@ static void procshow(char *attrs);
 static void procwindow(char *attrs);
 static void procx11events(void);
 static void resetfifo(void);
+static void quit(const Arg *arg);
 static void run(void);
-static int  getwindow(Window w);
 static void setup(void);
 static void usage(void);
-static void quit(const Arg *arg);
 static void writeout(const char *msg, ...);
 
 /* variables */
@@ -108,6 +114,7 @@ static void (*handler[LASTEvent]) (const XEvent *) = {
 	[KeyPress] = keypress,
 	[FocusIn] = focusin,
 	[DestroyNotify] = destroynotify,
+	[ConfigureNotify] = configurenotify,
 };
 
 static FILE *outfile;
@@ -121,6 +128,11 @@ static int nwindows = 0;
 static int sel = -1;
 
 #include "config.h"
+
+void
+addbox(SwtWindow *w, Bool hbox) {
+	writeout("add %s box for %s\n", hbox ? "horizontal":"vertical", w->name);
+}
 
 void
 cleanup(void) {
@@ -159,6 +171,19 @@ void
 closewindow(const Arg *arg) {
 	if(sel < 0) return;
 	XDestroyWindow(dpy, windows[sel]->win);
+}
+
+
+void
+configurenotify(const XEvent *e) {
+	const XConfigureEvent *ev = &e->xconfigure;
+
+	int w = getwindow(ev->window);
+
+	if(w > -1 && (ev->width != windows[w]->drw->w || ev->height != windows[w]->drw->h)) {
+		drw_resize(windows[w]->drw, ev->width, ev->height);
+		draw(windows[w]);
+	}
 }
 
 void
@@ -262,6 +287,11 @@ destroynotify(const XEvent *e) {
 }
 
 void
+draw(SwtWindow *w) {
+	writeout("drawing window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
+}
+
+void
 dumptree(void) {
 	for(int i=0; i<nwindows;i++) {
 		dumpwindow(windows[i]);
@@ -270,7 +300,7 @@ dumptree(void) {
 
 void
 dumpwindow(SwtWindow *w) {
-	writeout("window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
+	writeout("dump window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
 }
 
 void *
@@ -301,6 +331,26 @@ focusin(const XEvent *e) {
 		XGetInputFocus(dpy, &focused, &dummy);
 		sel = getwindow(focused);
 	}
+}
+
+int
+getwindow(Window w) {
+	for(int i=0;i<nwindows;i++) {
+		if(w == windows[i]->win) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+int
+getwindowc(char *name) {
+	for (int i=0;i<nwindows;i++) {
+		if(strcmp(name, windows[i]->name) == 0) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 void
@@ -384,6 +434,32 @@ procinput(void) {
 
 void
 procadd(char *attrs) {
+	char *parent = NULL, *wtype = NULL, *wattrs = NULL;
+
+	parent = attrs ? attrs : "swt";
+
+	if(attrs && (wtype = strchr(attrs, ' '))) {
+		*(wtype++) = '\0';
+	}
+	/* find parent widget/window or error and return */
+	int w = getwindowc(parent);
+
+	if(w < 0) {
+		writeout("ERROR window/widget \"%s\" not found\n", parent);
+		return;
+	}
+
+	if (wtype && (wattrs = strchr(wtype, ' '))) {
+		*(wattrs++) = '\0';
+	}
+
+	if(strcasecmp("hbox", wtype) == 0) {
+		addbox(windows[w], True); 
+	} else if(strcasecmp("vbox", wtype) == 0) {
+		addbox(windows[w], False);
+	} else {
+		writeout("ERROR unknown widget type: %s\n", wtype);
+	}
 }
 
 void
@@ -481,16 +557,6 @@ run(void) {
 	}
 
 	writeout("done\n");
-}
-
-int
-getwindow(Window w) {
-	for(int i=0;i<nwindows;i++) {
-		if(w == windows[i]->win) {
-			return i;
-		}
-	}
-	return -1;
 }
 
 void
