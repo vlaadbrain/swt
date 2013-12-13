@@ -55,6 +55,11 @@ Like most simple projects swt doesn't provide some fancy interface
 to *theme* the widget toolkit.  The best interface for that is your  
 favorite text editor pointed at config.h; and recompile...  
 
+Tests
+-----
+currently tests will require xdotool to automate X events
+- window.sh is a crude attempt at creating windows and quiting
+
 Gratitudes
 ----------
 THANKS ii,tabbed,swk ;)
