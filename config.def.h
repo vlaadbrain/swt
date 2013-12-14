@@ -9,6 +9,8 @@ static const char selbordercolor[]  = "#005577";
 static const char selbgcolor[]      = "#005577";
 static const char selfgcolor[]      = "#eeeeee";
 
+static const int bordersize = 1;  /* widget border spacing in pixels */
+
 #define MODKEY ControlMask
 static Key keys[] = { \
 	/* modifier                     key        function        argument */
