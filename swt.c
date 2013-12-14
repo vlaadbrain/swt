@@ -33,7 +33,7 @@
 
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel, SchemeLast }; /* color schemes */
-typedef enum { HorizBox, VertBox } BoxType;
+typedef enum { HorizBox, VertBox } SwtType;
 
 typedef union {
 	int i;
@@ -54,11 +54,22 @@ typedef struct {
 	int h;
 } Rect;
 
+/* we don't really use SwtWidget */
+/* but every widget has to look like it at the top */
+/* maybe there is a better way */
 typedef struct {
-	BoxType type;
+	SwtType type;
 	Rect r;
 	char name[256];
-	Bool hbox;
+} SwtWidget;
+
+typedef struct {
+	SwtType type;
+	Rect r;
+	char name[256];
+	SwtWidget *parent;
+	SwtWidget **kids;
+	int nkids;
 } SwtBox;
 
 typedef struct {
@@ -69,9 +80,11 @@ typedef struct {
 	Fnt *fnt;
 	Cur *cursor[CurLast];
 	ClrScheme scheme[SchemeLast];
+	SwtWidget **kids;
+	int nkids;
 } SwtWindow;
 
-static void addbox(SwtWindow *w, Bool hbox);
+static void addbox(SwtWindow *w, char *battrs, Bool hbox);
 static void cleanup(void);
 static void cleanupwindow(SwtWindow *w);
 static void closefifo(void);
@@ -82,9 +95,11 @@ static void createout(void);
 static void destroynotify(const XEvent *ev);
 static void draw(SwtWindow *w);
 static void dumptree(void);
+static void dumpwidget(SwtWidget *w);
 static void dumpwindow(SwtWindow *w);
 static void *emallocz(size_t size);
 static void *erealloc(void *o, size_t size);
+static void expose(const XEvent *ev);
 static void focusin(const XEvent *ev);
 static int  getwindow(Window w);
 static int  getwindowc(char *name);
@@ -97,6 +112,7 @@ static void procshow(char *attrs);
 static void procwindow(char *attrs);
 static void procx11events(void);
 static void resetfifo(void);
+static void resize(SwtWindow *w);
 static void quit(const Arg *arg);
 static void run(void);
 static void setup(void);
@@ -115,6 +131,7 @@ static void (*handler[LASTEvent]) (const XEvent *) = {
 	[FocusIn] = focusin,
 	[DestroyNotify] = destroynotify,
 	[ConfigureNotify] = configurenotify,
+	[Expose] = expose,
 };
 
 static FILE *outfile;
@@ -130,8 +147,25 @@ static int sel = -1;
 #include "config.h"
 
 void
-addbox(SwtWindow *w, Bool hbox) {
-	writeout("add %s box for %s\n", hbox ? "horizontal":"vertical", w->name);
+addbox(SwtWindow *w, char *battrs, Bool hbox) {
+	writeout("add %s for %s\n", hbox ? "hbox":"vbox", w->name);
+	SwtBox *box;
+
+	box = emallocz(sizeof(*box));
+	box->type = hbox ? HorizBox : VertBox;
+
+	box->r.x = bordersize;
+	box->r.y = bordersize;
+	box->r.w = w->drw->w - (bordersize*2);
+	box->r.h = w->drw->h - (bordersize*2);
+
+	strncpy(box->name, battrs, sizeof(box->name)-1);
+
+	w->nkids++;
+	w->kids = erealloc(w->kids, sizeof(SwtWidget *) * w->nkids);
+	w->kids[w->nkids -1] = (SwtWidget *)box;
+
+	draw(w);
 }
 
 void
@@ -182,7 +216,7 @@ configurenotify(const XEvent *e) {
 
 	if(w > -1 && (ev->width != windows[w]->drw->w || ev->height != windows[w]->drw->h)) {
 		drw_resize(windows[w]->drw, ev->width, ev->height);
-		draw(windows[w]);
+		resize(windows[w]);
 	}
 }
 
@@ -218,6 +252,7 @@ createwindow(char *name, char *title) {
 
 	swtwin = emallocz(sizeof(*swtwin));
 
+	swtwin->nkids = 0;
 	swtwin->drw = drw_create(dpy, screen, root, DisplayWidth(dpy, screen), DisplayHeight(dpy, screen));
 	swtwin->fnt = drw_font_create(dpy, font);
 	drw_setfont(swtwin->drw, swtwin->fnt);
@@ -235,7 +270,7 @@ createwindow(char *name, char *title) {
 	
 	swtwin->win = XCreateSimpleWindow(dpy, root, 0, 0, swtwin->drw->w, swtwin->drw->h, 0,
 			swtwin->scheme[SchemeNorm].fg->rgb, swtwin->scheme[SchemeNorm].bg->rgb);
-	XSelectInput(dpy, swtwin->win, KeyPressMask|ButtonPressMask|StructureNotifyMask|FocusChangeMask);
+	XSelectInput(dpy, swtwin->win, KeyPressMask|ButtonPressMask|StructureNotifyMask|FocusChangeMask|ExposureMask);
 
 	class_hint.res_name = name;
 	class_hint.res_class = "SWT";
@@ -288,7 +323,19 @@ destroynotify(const XEvent *e) {
 
 void
 draw(SwtWindow *w) {
-	writeout("drawing window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
+	writeout("drawing window xid=%lu name=%s title=%s width=%lu height=%lu\n",
+			w->win, w->name, w->title, w->drw->w, w->drw->h);
+	drw_setscheme(w->drw, &w->scheme[SchemeSel]);
+
+	Bool invert = true;
+	for (int i=0;i<w->nkids;i++) {
+		XSetForeground(w->drw->dpy, w->drw->gc,
+				invert ? w->drw->scheme->bg->rgb : w->drw->scheme->fg->rgb);
+		XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc,
+				w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h);
+	}
+
+	drw_map(w->drw, w->win, 0, 0, w->drw->w, w->drw->h);
 }
 
 void
@@ -299,8 +346,16 @@ dumptree(void) {
 }
 
 void
+dumpwidget(SwtWidget *w) {
+	writeout("dump %s name=\"%s\" w=%lu h=%lu\n", w->type == HorizBox ? "hbox" : "vbox",  w->name, w->r.w, w->r.h);
+}
+
+void
 dumpwindow(SwtWindow *w) {
 	writeout("dump window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
+	for(int i=0; i<w->nkids;i++) {
+		dumpwidget((SwtWidget *)w->kids[i]);
+	}
 }
 
 void *
@@ -322,11 +377,24 @@ erealloc(void *o, size_t size) {
 }
 
 void
+expose(const XEvent *e) {
+	const XExposeEvent *ev = &e->xexpose;
+	int w;
+
+	writeout("expose event\n");
+	if(ev->count == 0) {
+		w = getwindow(ev->window);
+		draw(windows[w]);
+	}
+}
+
+void
 focusin(const XEvent *e) {
 	const XFocusChangeEvent *ev = &e->xfocus;
 	int dummy;
 	Window focused;
 
+	writeout("focusin event\n");
 	if(ev->mode != NotifyUngrab) {
 		XGetInputFocus(dpy, &focused, &dummy);
 		sel = getwindow(focused);
@@ -454,9 +522,9 @@ procadd(char *attrs) {
 	}
 
 	if(strcasecmp("hbox", wtype) == 0) {
-		addbox(windows[w], True); 
+		addbox(windows[w], wattrs, True);
 	} else if(strcasecmp("vbox", wtype) == 0) {
-		addbox(windows[w], False);
+		addbox(windows[w], wattrs, False);
 	} else {
 		writeout("ERROR unknown widget type: %s\n", wtype);
 	}
@@ -510,6 +578,18 @@ void
 resetfifo(void) {
 	closefifo();
 	createfifo();
+}
+
+void
+resize(SwtWindow *w) {
+	for(int i=0;i<w->nkids;i++) {
+		if(w->kids[i]->type == HorizBox) {
+			w->kids[i]->r.x = bordersize;
+			w->kids[i]->r.y = bordersize;
+			w->kids[i]->r.w = w->drw->w - (bordersize*2);
+			w->kids[i]->r.h = w->drw->h - (bordersize*2);
+		}
+	}
 }
 
 void
