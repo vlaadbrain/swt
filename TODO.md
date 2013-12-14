@@ -3,4 +3,4 @@ TODO
 
 - clean up windows upon quit
 - lorem ipsum text
-- resize
+- resize XGetGeometry for drawing widgets
