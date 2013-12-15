@@ -30,16 +30,17 @@ Commands
 
 	<commands> ::= <command> { ";" <command> }  
 	<command>  ::= <window>  | <add> | <show> | <dump> | <quit>  
-	<window>   ::= window <sp> <name>  
+	<hwindow>   ::= window <sp> <name> <title>  
 		returns "window <name> <xid>"  
+	<hwindow>   ::= hwindow <sp> <name> <title>  
+	<vwindow>   ::= vwindow <sp> <name> <title>  
 	<show>     ::= show <sp> <name> | show all  
 	<dump>     ::= dump <sp> all | dump <sp> <name>  
 	<quit>     ::= quit  
 	<add>      ::= add <sp> <parent> <sp> <widget>  
 	<parent>   ::= <name>  
-	<widget>   ::= <hbox> | <vbox> | <embed>  
-	<hbox>     ::= hbox <sp> <name> <sp> <widget-attributes>  
-	<vbox>     ::= vbox <sp> <name> <sp> <widget-attributes>  
+	<widget>   ::= <text> | <embed>  
+	<text>     ::= text <sp> <name> <sp> <widget-attributes>  
 	<embed>    ::= embed <sp> <xid>  
 	...
 	<name>     ::= <alpha-num>  

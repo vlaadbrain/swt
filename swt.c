@@ -33,7 +33,7 @@
 
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel, SchemeLast }; /* color schemes */
-typedef enum { HorizBox, VertBox } SwtType;
+typedef enum { HorizLayout, VertLayout } SwtLayout;
 
 typedef union {
 	int i;
@@ -54,23 +54,10 @@ typedef struct {
 	int h;
 } Rect;
 
-/* we don't really use SwtWidget */
-/* but every widget has to look like it at the top */
-/* maybe there is a better way */
 typedef struct {
-	SwtType type;
 	Rect r;
 	char name[256];
 } SwtWidget;
-
-typedef struct {
-	SwtType type;
-	Rect r;
-	char name[256];
-	SwtWidget *parent;
-	SwtWidget **kids;
-	int nkids;
-} SwtBox;
 
 typedef struct {
 	Window win;
@@ -80,6 +67,7 @@ typedef struct {
 	Fnt *fnt;
 	SwtWidget **kids;
 	int nkids;
+	SwtLayout layout;
 } SwtWindow;
 
 static void addbox(SwtWindow *w, char *battrs, Bool hbox);
@@ -90,6 +78,7 @@ static void closewindow(const Arg *arg);
 static void configurenotify(const XEvent *ev);
 static void createfifo(void);
 static void createout(void);
+static SwtWindow *createwindow(char *name, char *title, Bool hlayout);
 static void destroynotify(const XEvent *ev);
 static void draw(SwtWindow *w);
 static void dumptree(void);
@@ -107,7 +96,7 @@ static void procinput(void);
 static void procadd(char *attrs);
 static void procremove(char *attrs);
 static void procshow(char *attrs);
-static void procwindow(char *attrs);
+static void procwindow(char *attrs, Bool hlayout);
 static void procx11events(void);
 static void resetfifo(void);
 static void resize(SwtWindow *w);
@@ -149,10 +138,9 @@ static int sel = -1;
 void
 addbox(SwtWindow *w, char *battrs, Bool hbox) {
 	writeout("add %s for %s\n", hbox ? "hbox":"vbox", w->name);
-	SwtBox *box;
+	SwtWidget *box;
 
 	box = emallocz(sizeof(*box));
-	box->type = hbox ? HorizBox : VertBox;
 
 	box->r.x = bordersize;
 	box->r.y = bordersize;
@@ -163,7 +151,7 @@ addbox(SwtWindow *w, char *battrs, Bool hbox) {
 
 	w->nkids++;
 	w->kids = erealloc(w->kids, sizeof(SwtWidget *) * w->nkids);
-	w->kids[w->nkids -1] = (SwtWidget *)box;
+	w->kids[w->nkids -1] = box;
 
 	draw(w);
 }
@@ -248,7 +236,7 @@ createout(void) {
 }
 
 SwtWindow *
-createwindow(char *name, char *title) {
+createwindow(char *name, char *title, Bool hlayout) {
 	XClassHint class_hint;
 	XTextProperty xtp;
 	SwtWindow *swtwin;
@@ -256,6 +244,7 @@ createwindow(char *name, char *title) {
 	swtwin = emallocz(sizeof(*swtwin));
 
 	swtwin->nkids = 0;
+	swtwin->layout = hlayout ? HorizLayout : VertLayout;
 	swtwin->drw = drw_create(dpy, screen, root, DisplayWidth(dpy, screen), DisplayHeight(dpy, screen));
 	swtwin->fnt = drw_font_create(dpy, font);
 	drw_setfont(swtwin->drw, swtwin->fnt);
@@ -339,14 +328,14 @@ dumptree(void) {
 
 void
 dumpwidget(SwtWidget *w) {
-	writeout("dump %s name=\"%s\" w=%lu h=%lu\n", w->type == HorizBox ? "hbox" : "vbox",  w->name, w->r.w, w->r.h);
+	writeout("dump %s name=\"%s\" w=%lu h=%lu\n", "box",  w->name, w->r.w, w->r.h);
 }
 
 void
 dumpwindow(SwtWindow *w) {
 	writeout("dump window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
 	for(int i=0; i<w->nkids;i++) {
-		dumpwidget((SwtWidget *)w->kids[i]);
+		dumpwidget(w->kids[i]);
 	}
 }
 
@@ -471,14 +460,22 @@ procinput(void) {
 			} else if(strcasecmp("quit", command) == 0) {
 				quit(NULL);
 			} else if(strcasecmp("window", command) == 0) {
-				procwindow(NULL);
+				procwindow(NULL, true); /* defaul horizontal */
+			} else if(strcasecmp("hwindow", command) == 0) {
+				procwindow(NULL, true);
+			} else if(strcasecmp("vwindow", command) == 0) {
+				procwindow(NULL, false);
 			} else
 				writeout("ERROR parsing command: %s\n", command);
 			continue;
 		}
 
 		if(strcasecmp("window", command) == 0) {
-			procwindow(attributes);
+			procwindow(attributes, true); /* default horizontal */
+		} else if(strcasecmp("hwindow", command) == 0) {
+			procwindow(attributes, true);
+		} else if(strcasecmp("vwindow", command) == 0) {
+			procwindow(attributes, false);
 		} else if(strcasecmp("add", command) == 0) {
 			procadd(attributes);
 		} else if(strcasecmp("show", command) == 0) {
@@ -531,7 +528,7 @@ procshow(char *attrs) {
 }
 
 void
-procwindow(char *attrs) {
+procwindow(char *attrs, Bool hlayout) {
 	char *name = NULL, *title = NULL;
 	SwtWindow *sw;
 
@@ -542,7 +539,7 @@ procwindow(char *attrs) {
 		title = "swt window";
 	}
 
-	sw = createwindow(name, title);
+	sw = createwindow(name, title, hlayout);
 
 	XMapWindow(dpy, sw->win);
 
@@ -575,12 +572,10 @@ resetfifo(void) {
 void
 resize(SwtWindow *w) {
 	for(int i=0;i<w->nkids;i++) {
-		if(w->kids[i]->type == HorizBox) {
-			w->kids[i]->r.x = bordersize;
-			w->kids[i]->r.y = bordersize;
-			w->kids[i]->r.w = w->drw->w - (bordersize*2);
-			w->kids[i]->r.h = w->drw->h - (bordersize*2);
-		}
+		w->kids[i]->r.x = bordersize;
+		w->kids[i]->r.y = bordersize;
+		w->kids[i]->r.w = w->drw->w - (bordersize*2);
+		w->kids[i]->r.h = w->drw->h - (bordersize*2);
 	}
 }
 
