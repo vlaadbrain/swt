@@ -78,8 +78,6 @@ typedef struct {
 	char title[256];
 	Drw *drw;
 	Fnt *fnt;
-	Cur *cursor[CurLast];
-	ClrScheme scheme[SchemeLast];
 	SwtWidget **kids;
 	int nkids;
 } SwtWindow;
@@ -140,6 +138,8 @@ static Bool running = True;
 static int screen;
 static Display *dpy;
 static Window root;
+static Cur *cursor[CurLast];
+static ClrScheme scheme[SchemeLast];
 static SwtWindow **windows;
 static int nwindows = 0;
 static int sel = -1;
@@ -172,23 +172,26 @@ void
 cleanup(void) {
 	closefifo();
 
+	drw_clr_free(scheme[SchemeNorm].border);
+	drw_clr_free(scheme[SchemeNorm].bg);
+	drw_clr_free(scheme[SchemeNorm].fg);
+	drw_clr_free(scheme[SchemeSel].border);
+	drw_clr_free(scheme[SchemeSel].bg);
+	drw_clr_free(scheme[SchemeSel].fg);
+
+	XFreeCursor(dpy, cursor[CurNormal]->cursor);
+	XFreeCursor(dpy, cursor[CurResize]->cursor);
+	XFreeCursor(dpy, cursor[CurMove]->cursor);
+	free(cursor[CurNormal]);
+	free(cursor[CurResize]);
+	free(cursor[CurMove]);
+
 	if(fclose(outfile) == -1) {
 		perror("swt unable to close outfile");
 	}
 }
 
 void cleanupwindow(SwtWindow *w) {
-	drw_clr_free(w->scheme[SchemeNorm].border);
-	drw_clr_free(w->scheme[SchemeNorm].bg);
-	drw_clr_free(w->scheme[SchemeNorm].fg);
-	drw_clr_free(w->scheme[SchemeSel].border);
-	drw_clr_free(w->scheme[SchemeSel].bg);
-	drw_clr_free(w->scheme[SchemeSel].fg);
-
-	drw_cur_free(w->drw, w->cursor[CurNormal]);
-	drw_cur_free(w->drw, w->cursor[CurResize]);
-	drw_cur_free(w->drw, w->cursor[CurMove]);
-
 	drw_font_free(dpy, w->fnt);
 	drw_free(w->drw);
 
@@ -257,19 +260,8 @@ createwindow(char *name, char *title) {
 	swtwin->fnt = drw_font_create(dpy, font);
 	drw_setfont(swtwin->drw, swtwin->fnt);
 
-	swtwin->cursor[CurNormal] = drw_cur_create(swtwin->drw, XC_left_ptr);
-	swtwin->cursor[CurResize] = drw_cur_create(swtwin->drw, XC_sizing);
-	swtwin->cursor[CurMove] = drw_cur_create(swtwin->drw, XC_fleur);
-
-	swtwin->scheme[SchemeNorm].border = drw_clr_create(swtwin->drw, normbordercolor);
-	swtwin->scheme[SchemeNorm].bg = drw_clr_create(swtwin->drw, normbgcolor);
-	swtwin->scheme[SchemeNorm].fg = drw_clr_create(swtwin->drw, normfgcolor);
-	swtwin->scheme[SchemeSel].border = drw_clr_create(swtwin->drw, selbordercolor);
-	swtwin->scheme[SchemeSel].bg = drw_clr_create(swtwin->drw, selbgcolor);
-	swtwin->scheme[SchemeSel].fg = drw_clr_create(swtwin->drw, selfgcolor);
-	
 	swtwin->win = XCreateSimpleWindow(dpy, root, 0, 0, swtwin->drw->w, swtwin->drw->h, 0,
-			swtwin->scheme[SchemeNorm].fg->rgb, swtwin->scheme[SchemeNorm].bg->rgb);
+			scheme[SchemeNorm].fg->rgb, scheme[SchemeNorm].bg->rgb);
 	XSelectInput(dpy, swtwin->win, KeyPressMask|ButtonPressMask|StructureNotifyMask|FocusChangeMask|ExposureMask);
 
 	class_hint.res_name = name;
@@ -325,12 +317,12 @@ void
 draw(SwtWindow *w) {
 	writeout("drawing window xid=%lu name=%s title=%s width=%lu height=%lu\n",
 			w->win, w->name, w->title, w->drw->w, w->drw->h);
-	drw_setscheme(w->drw, &w->scheme[SchemeSel]);
+	drw_setscheme(w->drw, &scheme[SchemeSel]);
 
 	Bool invert = true;
 	for (int i=0;i<w->nkids;i++) {
 		XSetForeground(w->drw->dpy, w->drw->gc,
-				invert ? w->drw->scheme->bg->rgb : w->drw->scheme->fg->rgb);
+				invert ? scheme->bg->rgb : scheme->fg->rgb);
 		XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc,
 				w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h);
 	}
@@ -646,6 +638,19 @@ setup(void) {
 
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
+
+	Drw *drw = drw_create(dpy, screen, root, DisplayWidth(dpy, screen), DisplayHeight(dpy, screen));
+	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
+	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
+	cursor[CurMove]   = drw_cur_create(drw, XC_fleur);
+
+	scheme[SchemeNorm].fg     = drw_clr_create(drw, normfgcolor);
+	scheme[SchemeNorm].bg     = drw_clr_create(drw, normbgcolor);
+	scheme[SchemeNorm].border = drw_clr_create(drw, normbordercolor);
+	scheme[SchemeSel].fg      = drw_clr_create(drw, selfgcolor);
+	scheme[SchemeSel].bg      = drw_clr_create(drw, selbgcolor);
+	scheme[SchemeSel].border  = drw_clr_create(drw, selbordercolor);
+	drw_free(drw);
 }
 
 void
