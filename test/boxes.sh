@@ -5,7 +5,7 @@ BIN="../swt"
 IN="./in"
 OUT="./out"
 
-exec $BIN -i $IN -o $OUT &
+exec valgrind --leak-check=full $BIN -i $IN -o $OUT &
 
 SWT_PID=$!
 
@@ -16,7 +16,7 @@ sleep 1
 WIN_ID=`grep "window testing" $OUT | awk '{print $3}'`
 echo "WIN_ID=${WIN_ID}"
 sleep 1
-echo "add testing hbox these are the attrs" > $IN
+echo "add testing text 'lorem ipsum'" > $IN
 sleep 2
 echo "dump" > $IN
 sleep 2

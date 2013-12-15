@@ -70,8 +70,9 @@ typedef struct {
 	SwtLayout layout;
 } SwtWindow;
 
-static void addbox(SwtWindow *w, char *battrs, Bool hbox);
+static void addwidget(SwtWindow *w, char *battrs);
 static void cleanup(void);
+static void cleanupwidget(SwtWidget *w);
 static void cleanupwindow(SwtWindow *w);
 static void closefifo(void);
 static void closewindow(const Arg *arg);
@@ -136,23 +137,19 @@ static int sel = -1;
 #include "config.h"
 
 void
-addbox(SwtWindow *w, char *battrs, Bool hbox) {
-	writeout("add %s for %s\n", hbox ? "hbox":"vbox", w->name);
-	SwtWidget *box;
+addwidget(SwtWindow *w, char *battrs) {
+	SwtWidget *widget;
 
-	box = emallocz(sizeof(*box));
+	widget = emallocz(sizeof(*widget));
 
-	box->r.x = bordersize;
-	box->r.y = bordersize;
-	box->r.w = w->drw->w - (bordersize*2);
-	box->r.h = w->drw->h - (bordersize*2);
-
-	strncpy(box->name, battrs, sizeof(box->name)-1);
+	strncpy(widget->name, battrs, sizeof(widget->name)-1);
 
 	w->nkids++;
 	w->kids = erealloc(w->kids, sizeof(SwtWidget *) * w->nkids);
-	w->kids[w->nkids -1] = box;
 
+	w->kids[w->nkids - 1] = widget;
+
+	resize(w);
 	draw(w);
 }
 
@@ -174,14 +171,26 @@ cleanup(void) {
 	free(cursor[CurResize]);
 	free(cursor[CurMove]);
 
+	for(int i=0;i<nwindows;i++) {
+		cleanupwindow(windows[i]);
+	}
+
 	if(fclose(outfile) == -1) {
 		perror("swt unable to close outfile");
 	}
 }
 
+void cleanupwidget(SwtWidget *w) {
+	free(w);
+}
+
 void cleanupwindow(SwtWindow *w) {
 	drw_font_free(dpy, w->fnt);
 	drw_free(w->drw);
+
+	for(int i=0;i<w->nkids;i++) {
+		cleanupwidget(w->kids[i]);
+	}
 
 	free(w);
 }
@@ -510,10 +519,8 @@ procadd(char *attrs) {
 		*(wattrs++) = '\0';
 	}
 
-	if(strcasecmp("hbox", wtype) == 0) {
-		addbox(windows[w], wattrs, True);
-	} else if(strcasecmp("vbox", wtype) == 0) {
-		addbox(windows[w], wattrs, False);
+	if(strcasecmp("text", wtype) == 0) {
+		addwidget(windows[w], wattrs);
 	} else {
 		writeout("ERROR unknown widget type: %s\n", wtype);
 	}
