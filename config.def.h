@@ -16,4 +16,6 @@ static Key keys[] = { \
 	/* modifier                     key        function        argument */
 	{ MODKEY,                       XK_q,      quit,           { 0 } },
 	{ MODKEY,                       XK_c,      closewindow,    { 0 } },
+	{ MODKEY,                       XK_j,      toggleselect,   { .i = +1 } },
+	{ MODKEY,                       XK_k,      toggleselect,   { .i = -1 } },
 };

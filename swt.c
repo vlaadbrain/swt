@@ -100,11 +100,12 @@ static void procremove(char *attrs);
 static void procshow(char *attrs);
 static void procwindow(char *attrs, Bool hlayout);
 static void procx11events(void);
+static void quit(const Arg *arg);
 static void resetfifo(void);
 static void resize(SwtWindow *w);
-static void quit(const Arg *arg);
 static void run(void);
 static void setup(void);
+static void toggleselect(const Arg *arg);
 static void usage(void);
 static void writeout(const char *msg, ...);
 
@@ -322,16 +323,16 @@ draw(SwtWindow *w) {
 	XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc, 0, 0, w->drw->w, w->drw->h);
 
 	for (int i=0;i<w->nkids;i++) {
+	int filled = 0, empty = 0;
 		if(w->sel == i) {
-			XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeSel].fg->rgb);
-			XSetBackground(w->drw->dpy, w->drw->gc, scheme[SchemeSel].bg->rgb);
+			drw_setscheme(w->drw, &scheme[SchemeSel]);
+			filled = 1;
 		} else {
-			XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeNorm].fg->rgb);
-			XSetBackground(w->drw->dpy, w->drw->gc, scheme[SchemeNorm].bg->rgb);
+			drw_setscheme(w->drw, &scheme[SchemeNorm]);
+			empty = 1;
 		}
-		XDrawRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc,
-				w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h);
-		
+		drw_text(w->drw, w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h, w->kids[i]->name, 0);
+		drw_rect(w->drw, w->kids[i]->r.x, w->kids[i]->r.y, 0, 0, filled, empty, 0);
 	}
 
 	drw_map(w->drw, w->win, 0, 0, w->drw->w, w->drw->h);
@@ -675,6 +676,21 @@ setup(void) {
 	scheme[SchemeSel].bg      = drw_clr_create(drw, selbgcolor);
 	scheme[SchemeSel].border  = drw_clr_create(drw, selbordercolor);
 	drw_free(drw);
+}
+
+void
+toggleselect(const Arg *arg) {
+	if(sel < 0) return;
+	int cur = windows[sel]->sel;
+	cur += arg->i;
+
+	if(cur >= windows[sel]->nkids)
+		cur = 0;
+	if(cur < 0)
+		cur = windows[sel]->nkids - 1;
+
+	windows[sel]->sel = cur;
+	draw(windows[sel]);
 }
 
 void
