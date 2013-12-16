@@ -315,12 +315,12 @@ void
 draw(SwtWindow *w) {
 	writeout("drawing window xid=%lu name=%s title=%s width=%lu height=%lu\n",
 			w->win, w->name, w->title, w->drw->w, w->drw->h);
-	drw_setscheme(w->drw, &scheme[SchemeSel]);
 
-	Bool invert = true;
+	XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeNorm].bg->rgb);
+	XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc, 0, 0, w->drw->w, w->drw->h);
+
 	for (int i=0;i<w->nkids;i++) {
-		XSetForeground(w->drw->dpy, w->drw->gc,
-				invert ? scheme->bg->rgb : scheme->fg->rgb);
+		XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeSel].bg->rgb);
 		XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc,
 				w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h);
 	}
@@ -371,7 +371,6 @@ expose(const XEvent *e) {
 	const XExposeEvent *ev = &e->xexpose;
 	int w;
 
-	writeout("expose event\n");
 	if(ev->count == 0) {
 		w = getwindow(ev->window);
 		draw(windows[w]);
@@ -384,7 +383,6 @@ focusin(const XEvent *e) {
 	int dummy;
 	Window focused;
 
-	writeout("focusin event\n");
 	if(ev->mode != NotifyUngrab) {
 		XGetInputFocus(dpy, &focused, &dummy);
 		sel = getwindow(focused);
@@ -577,12 +575,27 @@ resetfifo(void) {
 }
 
 void
-resize(SwtWindow *w) {
-	for(int i=0;i<w->nkids;i++) {
-		w->kids[i]->r.x = bordersize;
-		w->kids[i]->r.y = bordersize;
-		w->kids[i]->r.w = w->drw->w - (bordersize*2);
-		w->kids[i]->r.h = w->drw->h - (bordersize*2);
+resize(SwtWindow *win) {
+	int w,h;
+
+	w = win->drw->w;
+	h = win->drw->h;
+	if(win->layout == HorizLayout) {
+		h = win->nkids ? win->drw->h / win->nkids : win->drw->h;
+	} else if(win->layout == VertLayout) {
+		w = win->nkids ? win->drw->w / win->nkids : win->drw->w;
+	}
+
+	for(int i=0;i<win->nkids;i++) {
+		win->kids[i]->r.x = bordersize;
+		win->kids[i]->r.y = bordersize;
+		if(win->layout == HorizLayout) {
+			win->kids[i]->r.y = bordersize + (h*i);
+		} else if(win->layout == VertLayout) {
+			win->kids[i]->r.x = bordersize + (w*i);
+		}
+		win->kids[i]->r.w = w - (bordersize*2);
+		win->kids[i]->r.h = h - (bordersize*2);
 	}
 }
 
