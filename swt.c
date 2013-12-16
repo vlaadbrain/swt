@@ -66,6 +66,7 @@ typedef struct {
 	Drw *drw;
 	Fnt *fnt;
 	SwtWidget **kids;
+	int sel;
 	int nkids;
 	SwtLayout layout;
 } SwtWindow;
@@ -253,6 +254,7 @@ createwindow(char *name, char *title, Bool hlayout) {
 	swtwin = emallocz(sizeof(*swtwin));
 
 	swtwin->nkids = 0;
+	swtwin->sel = 0;
 	swtwin->layout = hlayout ? HorizLayout : VertLayout;
 	swtwin->drw = drw_create(dpy, screen, root, DisplayWidth(dpy, screen), DisplayHeight(dpy, screen));
 	swtwin->fnt = drw_font_create(dpy, font);
@@ -320,9 +322,16 @@ draw(SwtWindow *w) {
 	XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc, 0, 0, w->drw->w, w->drw->h);
 
 	for (int i=0;i<w->nkids;i++) {
-		XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeSel].bg->rgb);
-		XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc,
+		if(w->sel == i) {
+			XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeSel].fg->rgb);
+			XSetBackground(w->drw->dpy, w->drw->gc, scheme[SchemeSel].bg->rgb);
+		} else {
+			XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeNorm].fg->rgb);
+			XSetBackground(w->drw->dpy, w->drw->gc, scheme[SchemeNorm].bg->rgb);
+		}
+		XDrawRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc,
 				w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h);
+		
 	}
 
 	drw_map(w->drw, w->win, 0, 0, w->drw->w, w->drw->h);
