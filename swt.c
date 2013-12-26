@@ -431,6 +431,10 @@ keypress(const XEvent *e) {
 				&& CLEANMASK(keys[i].mod) == CLEANMASK(ev->state)
 				&& keys[i].func) {
 			keys[i].func(&(keys[i].arg));
+		} else if(keysym == XK_Escape) {
+			/* exit INSERT mode */
+		} else {
+			/* insert to selected inputfield */
 		}
 	}
 }
