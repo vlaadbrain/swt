@@ -65,9 +65,9 @@ typedef struct {
 	char title[256];
 	Drw *drw;
 	Fnt *fnt;
-	SwtText **kids;
+	SwtText **regions;
 	int sel;
-	int nkids;
+	int nregions;
 	SwtLayout layout;
 } SwtWindow;
 
@@ -146,10 +146,10 @@ addwidget(SwtWindow *w, char *battrs) {
 
 	strncpy(widget->name, battrs, sizeof(widget->name)-1);
 
-	w->nkids++;
-	w->kids = erealloc(w->kids, sizeof(SwtText *) * w->nkids);
+	w->nregions++;
+	w->regions = erealloc(w->regions, sizeof(SwtText *) * w->nregions);
 
-	w->kids[w->nkids - 1] = widget;
+	w->regions[w->nregions - 1] = widget;
 
 	resize(w);
 	draw(w);
@@ -190,8 +190,8 @@ void cleanupwindow(SwtWindow *w) {
 	drw_font_free(dpy, w->fnt);
 	drw_free(w->drw);
 
-	for(int i=0;i<w->nkids;i++) {
-		cleanupwidget(w->kids[i]);
+	for(int i=0;i<w->nregions;i++) {
+		cleanupwidget(w->regions[i]);
 	}
 
 	free(w);
@@ -254,7 +254,7 @@ createwindow(char *name, char *title, Bool hlayout) {
 
 	swtwin = emallocz(sizeof(*swtwin));
 
-	swtwin->nkids = 0;
+	swtwin->nregions = 0;
 	swtwin->sel = 0;
 	swtwin->layout = hlayout ? HorizLayout : VertLayout;
 	swtwin->drw = drw_create(dpy, screen, root, DisplayWidth(dpy, screen), DisplayHeight(dpy, screen));
@@ -322,7 +322,7 @@ draw(SwtWindow *w) {
 	XSetForeground(w->drw->dpy, w->drw->gc, scheme[SchemeNorm].bg->rgb);
 	XFillRectangle(w->drw->dpy, w->drw->drawable, w->drw->gc, 0, 0, w->drw->w, w->drw->h);
 
-	for (int i=0;i<w->nkids;i++) {
+	for (int i=0;i<w->nregions;i++) {
 	int filled = 0, empty = 0;
 		if(w->sel == i) {
 			drw_setscheme(w->drw, &scheme[SchemeSel]);
@@ -331,8 +331,8 @@ draw(SwtWindow *w) {
 			drw_setscheme(w->drw, &scheme[SchemeNorm]);
 			empty = 1;
 		}
-		drw_text(w->drw, w->kids[i]->r.x, w->kids[i]->r.y, w->kids[i]->r.w, w->kids[i]->r.h, w->kids[i]->name, 0);
-		drw_rect(w->drw, w->kids[i]->r.x, w->kids[i]->r.y, 0, 0, filled, empty, 0);
+		drw_text(w->drw, w->regions[i]->r.x, w->regions[i]->r.y, w->regions[i]->r.w, w->regions[i]->r.h, w->regions[i]->name, 0);
+		drw_rect(w->drw, w->regions[i]->r.x, w->regions[i]->r.y, 0, 0, filled, empty, 0);
 	}
 
 	drw_map(w->drw, w->win, 0, 0, w->drw->w, w->drw->h);
@@ -353,8 +353,8 @@ dumptext(SwtText *w) {
 void
 dumpwindow(SwtWindow *w) {
 	writeout("dump window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
-	for(int i=0; i<w->nkids;i++) {
-		dumptext(w->kids[i]);
+	for(int i=0; i<w->nregions;i++) {
+		dumptext(w->regions[i]);
 	}
 }
 
@@ -595,21 +595,21 @@ resize(SwtWindow *win) {
 	w = win->drw->w;
 	h = win->drw->h;
 	if(win->layout == HorizLayout) {
-		h = win->nkids ? win->drw->h / win->nkids : win->drw->h;
+		h = win->nregions ? win->drw->h / win->nregions : win->drw->h;
 	} else if(win->layout == VertLayout) {
-		w = win->nkids ? win->drw->w / win->nkids : win->drw->w;
+		w = win->nregions ? win->drw->w / win->nregions : win->drw->w;
 	}
 
-	for(int i=0;i<win->nkids;i++) {
-		win->kids[i]->r.x = bordersize;
-		win->kids[i]->r.y = bordersize;
+	for(int i=0;i<win->nregions;i++) {
+		win->regions[i]->r.x = bordersize;
+		win->regions[i]->r.y = bordersize;
 		if(win->layout == HorizLayout) {
-			win->kids[i]->r.y = bordersize + (h*i);
+			win->regions[i]->r.y = bordersize + (h*i);
 		} else if(win->layout == VertLayout) {
-			win->kids[i]->r.x = bordersize + (w*i);
+			win->regions[i]->r.x = bordersize + (w*i);
 		}
-		win->kids[i]->r.w = w - (bordersize*2);
-		win->kids[i]->r.h = h - (bordersize*2);
+		win->regions[i]->r.w = w - (bordersize*2);
+		win->regions[i]->r.h = h - (bordersize*2);
 	}
 }
 
@@ -688,10 +688,10 @@ toggleselect(const Arg *arg) {
 	int cur = windows[sel]->sel;
 	cur += arg->i;
 
-	if(cur >= windows[sel]->nkids)
+	if(cur >= windows[sel]->nregions)
 		cur = 0;
 	if(cur < 0)
-		cur = windows[sel]->nkids - 1;
+		cur = windows[sel]->nregions - 1;
 
 	windows[sel]->sel = cur;
 	draw(windows[sel]);
