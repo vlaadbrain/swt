@@ -57,7 +57,7 @@ typedef struct {
 typedef struct {
 	Rect r;
 	char name[256];
-} SwtWidget;
+} SwtText;
 
 typedef struct {
 	Window win;
@@ -65,7 +65,7 @@ typedef struct {
 	char title[256];
 	Drw *drw;
 	Fnt *fnt;
-	SwtWidget **kids;
+	SwtText **kids;
 	int sel;
 	int nkids;
 	SwtLayout layout;
@@ -73,7 +73,7 @@ typedef struct {
 
 static void addwidget(SwtWindow *w, char *battrs);
 static void cleanup(void);
-static void cleanupwidget(SwtWidget *w);
+static void cleanupwidget(SwtText *w);
 static void cleanupwindow(SwtWindow *w);
 static void closefifo(void);
 static void closewindow(const Arg *arg);
@@ -84,7 +84,7 @@ static SwtWindow *createwindow(char *name, char *title, Bool hlayout);
 static void destroynotify(const XEvent *ev);
 static void draw(SwtWindow *w);
 static void dumptree(void);
-static void dumpwidget(SwtWidget *w);
+static void dumpwidget(SwtText *w);
 static void dumpwindow(SwtWindow *w);
 static void *emallocz(size_t size);
 static void *erealloc(void *o, size_t size);
@@ -140,14 +140,14 @@ static int sel = -1;
 
 void
 addwidget(SwtWindow *w, char *battrs) {
-	SwtWidget *widget;
+	SwtText *widget;
 
 	widget = emallocz(sizeof(*widget));
 
 	strncpy(widget->name, battrs, sizeof(widget->name)-1);
 
 	w->nkids++;
-	w->kids = erealloc(w->kids, sizeof(SwtWidget *) * w->nkids);
+	w->kids = erealloc(w->kids, sizeof(SwtText *) * w->nkids);
 
 	w->kids[w->nkids - 1] = widget;
 
@@ -182,7 +182,7 @@ cleanup(void) {
 	}
 }
 
-void cleanupwidget(SwtWidget *w) {
+void cleanupwidget(SwtText *w) {
 	free(w);
 }
 
@@ -346,7 +346,7 @@ dumptree(void) {
 }
 
 void
-dumpwidget(SwtWidget *w) {
+dumpwidget(SwtText *w) {
 	writeout("dump %s name=\"%s\" w=%lu h=%lu\n", "box",  w->name, w->r.w, w->r.h);
 }
 
