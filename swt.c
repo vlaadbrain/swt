@@ -140,16 +140,16 @@ static int sel = -1;
 
 void
 addtext(SwtWindow *w, char *attrs) {
-	SwtText *widget;
+	SwtText *region;
 
-	widget = emallocz(sizeof(*widget));
+	region = emallocz(sizeof(*region));
 
-	strncpy(widget->name, attrs, sizeof(widget->name)-1);
+	strncpy(region->name, attrs, sizeof(region->name)-1);
 
 	w->nregions++;
 	w->regions = erealloc(w->regions, sizeof(SwtText *) * w->nregions);
 
-	w->regions[w->nregions - 1] = widget;
+	w->regions[w->nregions - 1] = region;
 
 	resize(w);
 	draw(w);
