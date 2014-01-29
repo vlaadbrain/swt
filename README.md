@@ -1,5 +1,3 @@
-# STILL IN PROGRESS
-
 swt - simple widget toolkit
 ===========================
 
