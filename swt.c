@@ -84,7 +84,7 @@ static SwtWindow *createwindow(char *name, char *title, Bool hlayout);
 static void destroynotify(const XEvent *ev);
 static void draw(SwtWindow *w);
 static void dumptree(void);
-static void dumpwidget(SwtText *w);
+static void dumptext(SwtText *w);
 static void dumpwindow(SwtWindow *w);
 static void *emallocz(size_t size);
 static void *erealloc(void *o, size_t size);
@@ -346,7 +346,7 @@ dumptree(void) {
 }
 
 void
-dumpwidget(SwtText *w) {
+dumptext(SwtText *w) {
 	writeout("dump %s name=\"%s\" w=%lu h=%lu\n", "box",  w->name, w->r.w, w->r.h);
 }
 
@@ -354,7 +354,7 @@ void
 dumpwindow(SwtWindow *w) {
 	writeout("dump window xid=%lu name=%s title=%s\n", w->win, w->name, w->title);
 	for(int i=0; i<w->nkids;i++) {
-		dumpwidget(w->kids[i]);
+		dumptext(w->kids[i]);
 	}
 }
 
