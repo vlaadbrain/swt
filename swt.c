@@ -71,7 +71,7 @@ typedef struct {
 	SwtLayout layout;
 } SwtWindow;
 
-static void addwidget(SwtWindow *w, char *battrs);
+static void addtext(SwtWindow *w, char *battrs);
 static void cleanup(void);
 static void cleanupwidget(SwtText *w);
 static void cleanupwindow(SwtWindow *w);
@@ -139,7 +139,7 @@ static int sel = -1;
 #include "config.h"
 
 void
-addwidget(SwtWindow *w, char *battrs) {
+addtext(SwtWindow *w, char *battrs) {
 	SwtText *widget;
 
 	widget = emallocz(sizeof(*widget));
@@ -532,7 +532,7 @@ procadd(char *attrs) {
 	}
 
 	if(strcasecmp("text", wtype) == 0) {
-		addwidget(windows[w], wattrs);
+		addtext(windows[w], wattrs);
 	} else {
 		writeout("ERROR unknown widget type: %s\n", wtype);
 	}
