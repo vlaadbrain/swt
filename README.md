@@ -56,7 +56,8 @@ favorite text editor pointed at config.h; and recompile...
 
 Tests
 -----
-currently tests will require xdotool to automate X events
+They're not really tests just scripts that go through some common use 
+cases currently tests will require xdotool to automate X events
 - window.sh is a crude attempt at creating windows and quiting
 
 Gratitudes
