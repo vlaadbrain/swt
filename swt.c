@@ -71,7 +71,7 @@ typedef struct {
 	SwtLayout layout;
 } SwtWindow;
 
-static void addtext(SwtWindow *w, char *battrs);
+static void addtext(SwtWindow *w, char *attrs);
 static void cleanup(void);
 static void cleanupwidget(SwtText *w);
 static void cleanupwindow(SwtWindow *w);
@@ -139,12 +139,12 @@ static int sel = -1;
 #include "config.h"
 
 void
-addtext(SwtWindow *w, char *battrs) {
+addtext(SwtWindow *w, char *attrs) {
 	SwtText *widget;
 
 	widget = emallocz(sizeof(*widget));
 
-	strncpy(widget->name, battrs, sizeof(widget->name)-1);
+	strncpy(widget->name, attrs, sizeof(widget->name)-1);
 
 	w->nregions++;
 	w->regions = erealloc(w->regions, sizeof(SwtText *) * w->nregions);
